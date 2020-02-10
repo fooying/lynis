@@ -6,7 +6,7 @@
 # ------------------
 #
 # Copyright 2007-2013, Michael Boelen
-# Copyright 2007-2017, CISOfy
+# Copyright 2007-2019, CISOfy
 #
 # Website  : https://cisofy.com
 # Blog     : http://linux-audit.com
@@ -55,7 +55,7 @@
                 LogText "Result: chkprintcap did NOT gave any warnings"
             else
                 Display --indent 2 --text "- Integrity check of printcap file" --result "${STATUS_WARNING}" --color RED
-                ReportSuggestion ${TEST_NO} "Run chkprintcap manually to test printcap file"
+                ReportSuggestion "${TEST_NO}" "Run chkprintcap manually to test printcap file"
                 LogText "Output from chkprintcap: ${FIND}"
                 LogText "Run chkprintcap and check the ${ROOTDIR}etc/printcap file"
             fi
@@ -69,8 +69,7 @@
     Register --test-no PRNT-2304 --weight L --network NO --category security --description "Check cupsd status"
     if [ ${SKIPTEST} -eq 0 ]; then
         LogText "Test: Checking cupsd status"
-        IsRunning cupsd
-        if [ ${RUNNING} -eq 1 ]; then
+        if IsRunning "cupsd"; then
             Display --indent 2 --text "- Checking cups daemon" --result "${STATUS_RUNNING}" --color GREEN
             LogText "Result: cups daemon running"
             CUPSD_RUNNING=1; PRINTING_DAEMON="cups"
@@ -118,14 +117,17 @@
         LogText "Test: Checking CUPS configuration file permissions"
         FIND=$(${LSBINARY} -l ${CUPSD_CONFIG_FILE} | ${CUTBINARY} -c 2-10)
         LogText "Result: found ${FIND}"
-        if [ "${FIND}" = "r--------" -o "${FIND}" = "rw-------" -o "${FIND}" = "rw-r-----" -o "${FIND}" = "rw-rw----" ]; then
-            Display --indent 4 --text "- File permissions" --result "${STATUS_OK}" --color GREEN
-            AddHP 1 1
-        else
-            Display --indent 4 --text "- File permissions" --result "${STATUS_WARNING}" --color RED
-            ReportSuggestion ${TEST_NO} "Access to CUPS configuration could be more strict."
-            AddHP 1 2
-        fi
+        case "${FIND}" in
+            r[w-]-[r-][w-]---- )
+                Display --indent 4 --text "- File permissions" --result "${STATUS_OK}" --color GREEN
+                AddHP 1 1
+                ;;
+            * )
+                Display --indent 4 --text "- File permissions" --result "${STATUS_WARNING}" --color RED
+                ReportSuggestion "${TEST_NO}" "Access to CUPS configuration could be more strict."
+                AddHP 1 2
+                ;;
+        esac
     fi
 #
 #################################################################################
@@ -155,12 +157,12 @@
                 AddHP 2 2
             else
                 LogText "Result: CUPS daemon running on one or more interfaces (not limited to localhost)"
-                ReportSuggestion ${TEST_NO} "Check CUPS configuration if it really needs to listen on the network"
+                ReportSuggestion "${TEST_NO}" "Check CUPS configuration if it really needs to listen on the network"
                 AddHP 1 2
             fi
         else
             LogText "Result: CUPS daemon is running on several network addresses"
-            ReportSuggestion ${TEST_NO} "Check CUPS configuration if it really needs to run on several network addresses"
+            ReportSuggestion "${TEST_NO}" "Check CUPS configuration if it really needs to run on several network addresses"
             AddHP 1 2
         fi
 
@@ -188,8 +190,7 @@
     Register --test-no PRNT-2314 --weight L --network NO --category security --description "Check lpd status"
     if [ ${SKIPTEST} -eq 0 ]; then
         LogText "Test: Checking lpd status"
-        IsRunning lpd
-        if [ ${RUNNING} -eq 1 ]; then
+        if IsRunning "lpd"; then
             Display --indent 2 --text "- Checking lp daemon" --result "${STATUS_RUNNING}" --color GREEN
             LogText "Result: lp daemon running"
             LPD_RUNNING=1; PRINTING_DAEMON="lp"
@@ -202,7 +203,7 @@
 #
 #################################################################################
 #
-    # Test        : PRNT-2416
+    # Test        : PRNT-2316
     # Description : Check /etc/qconfig file
     Register --test-no PRNT-2316 --os AIX --weight L --network NO --category security --description "Checking /etc/qconfig file"
     if [ ${SKIPTEST} -eq 0 ]; then
@@ -211,7 +212,7 @@
         FileIsReadable ${QDAEMON_CONFIG_FILE}
         if [ ${CANREAD} -eq 1 ]; then
             FIND=$(${GREPBINARY} -v "^\*" ${QDAEMON_CONFIG_FILE} | ${EGREPBINARY} "backend|device")
-            if [ ! -z "${FIND}" ]; then
+            if [ -n "${FIND}" ]; then
                 LogText "Result: printers are defined in ${QDAEMON_CONFIG_FILE}"
                 Display --indent 2 --text "- Checking /etc/qconfig file" --result "${STATUS_FOUND}" --color GREEN
                 QDAEMON_CONFIG_ENABLED=1
@@ -231,8 +232,7 @@
     Register --test-no PRNT-2418 --os AIX --weight L --network NO --category security --description "Checking qdaemon printer spooler status"
     if [ ${SKIPTEST} -eq 0 ]; then
         LogText "Test: Checking qdaemon status"
-        IsRunning qdaemon
-        if [ ${RUNNING} -eq 1 ]; then
+        if IsRunning "qdaemon"; then
             LogText "Result: qdaemon daemon running"
             Display --indent 2 --text "- Checking qdaemon daemon" --result "${STATUS_RUNNING}" --color GREEN
             QDAEMON_RUNNING=1; PRINTING_DAEMON="qdaemon"
@@ -240,7 +240,7 @@
             if [ ${QDAEMON_CONFIG_ENABLED} -eq 1 ]; then
                 LogText "Result: qdaemon daemon not running"
                 Display --indent 2 --text "- Checking qdaemon daemon" --result "${STATUS_NOT_RUNNING}" --color RED
-                ReportSuggestion ${TEST_NO} "Activate print spooler daemon (qdaemon) in order to process print jobs"
+                ReportSuggestion "${TEST_NO}" "Activate print spooler daemon (qdaemon) in order to process print jobs"
             else
                 LogText "Result: qdaemon daemon not running"
                 Display --indent 2 --text "- Checking qdaemon daemon" --result "${STATUS_NOT_RUNNING}" --color WHITE
@@ -267,7 +267,7 @@
                 done
                 LogText "Result: Found ${COUNT} old print jobs in /var/spool/lpd/qdir"
                 Display --indent 4 --text "- Checking old print jobs" --result "${STATUS_FOUND}" --color YELLOW
-                ReportSuggestion ${TEST_NO} "Check old print jobs in /var/spool/lpd/qdir to prevent new jobs from being processed"
+                ReportSuggestion "${TEST_NO}" "Check old print jobs in /var/spool/lpd/qdir to prevent new jobs from being processed"
                 LogText "Risk: Failed or defunct print jobs can occupy a lot of space and in some cases, prevent new jobs from being processed"
             else
                 LogText "Result: Old print jobs not found in /var/spool/lpd/qdir"
@@ -279,7 +279,7 @@
 #################################################################################
 #
 
-if [ ! -z ${PRINTING_DAEMON} ]; then Report "printing_daemon=${PRINTING_DAEMON}"; fi
+if [ -n "${PRINTING_DAEMON}" ]; then Report "printing_daemon=${PRINTING_DAEMON}"; fi
 
 WaitForKeyPress
 
